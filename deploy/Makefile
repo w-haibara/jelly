@@ -1,6 +1,6 @@
-deploy_bot: *.go
-	gofmt -w *.go
-	go build -o deploy_bot *.go
+deploy_bot: *.go */*.go
+	gofmt -w *.go */*.go
+	go build -o deploy_bot main.go
 
 .PHONY: init
 init:
