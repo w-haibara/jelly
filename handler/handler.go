@@ -17,7 +17,7 @@ import (
 
 const (
 	confirmDeploymentAction = "confirm-deployment"
-	gitHostingUrl           = "https://github.com/w-haibara/mypage"
+	releaseUrl              = "https://github.com/w-haibara/portfolio/releases"
 	gitBranch               = "master"
 )
 
@@ -64,9 +64,9 @@ func (client *Client) handleDeployCmd(event *slackevents.AppMentionEvent, arg st
 	msg := ""
 	if arg == "" {
 		arg = "latest"
-		msg = fmt.Sprintf("The latest version will be deploy (%v)", gitHostingUrl+"/tree/"+gitBranch)
+		msg = fmt.Sprintf("The latest version will be deploy (%v)", releaseUrl+"/latest")
 	} else {
-		msg = fmt.Sprintf("Commit: `%v` will be deploy (%v)", arg, gitHostingUrl+"/"+arg)
+		msg = fmt.Sprintf("Commit: `%v` will be deploy (%v)", arg, releaseUrl+"/tag/"+arg)
 	}
 	msg += "\nDo you want to continue?"
 	text := slack.NewTextBlockObject(slack.MarkdownType, msg, false, false)
@@ -163,10 +163,14 @@ func (client *Client) handleConfirmDeploymentAction(action *slack.BlockAction, p
 				log.Println(err)
 			}
 
-			deployer.Deploy(arg)
+			resultMsg := ""
+			if result, err := deployer.Deploy(arg); err == nil {
+				resultMsg = fmt.Sprintf("deployment completed\n%v", result)
+			} else {
+				resultMsg = fmt.Sprintf("deployment failed!\n%v", err)
+			}
 
-			endMsg := slack.MsgOptionText(
-				fmt.Sprintf("deployment completed"), false)
+			endMsg := slack.MsgOptionText(resultMsg, false)
 			if _, _, err := client.Api.PostMessage(payload.Channel.ID, endMsg); err != nil {
 				log.Println(err)
 			}

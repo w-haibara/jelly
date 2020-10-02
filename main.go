@@ -11,9 +11,9 @@ import (
 
 func getSecret(v string) string {
 	switch v {
-	case "token":
+	case "bot_token":
 		return os.Getenv("SLACK_BOT_TOKEN_DEPLOY")
-	case "secret":
+	case "signing_secret":
 		return os.Getenv("SLACK_SIGNING_SECRET_DEPLOY")
 	}
 	return ""
@@ -21,11 +21,11 @@ func getSecret(v string) string {
 
 func main() {
 	client := handler.NewClient(
-		slack.New(getSecret("token")),
+		slack.New(getSecret("bot_token")),
 	)
 
-	http.HandleFunc("/slack/events", client.GetEventsHandler(getSecret("secret")))
-	http.HandleFunc("/slack/actions", client.GetActionsHandler(getSecret("secret")))
+	http.HandleFunc("/slack/events", client.GetEventsHandler(getSecret("signing_secret")))
+	http.HandleFunc("/slack/actions", client.GetActionsHandler(getSecret("signing_secret")))
 
 	log.Println("[INFO] Server listening")
 
