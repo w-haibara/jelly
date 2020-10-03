@@ -1,31 +1,28 @@
 package main
 
 import (
+	"github.com/slack-go/slack"
+	"jelly/configure"
+	"jelly/handler"
 	"log"
 	"net/http"
-	"os"
-
-	"github.com/slack-go/slack"
-	"jelly/handler"
 )
 
-func getSecret(v string) string {
-	switch v {
-	case "bot_token":
-		return os.Getenv("SLACK_BOT_TOKEN_DEPLOY")
-	case "signing_secret":
-		return os.Getenv("SLACK_SIGNING_SECRET_DEPLOY")
-	}
-	return ""
-}
-
 func main() {
+	conf, err := configure.NewConf("./conf.json")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
 	client := handler.NewClient(
-		slack.New(getSecret("bot_token")),
+		slack.New(conf.GetOauthAccessToken()),
 	)
 
-	http.HandleFunc("/slack/events", client.GetEventsHandler(getSecret("signing_secret")))
-	http.HandleFunc("/slack/actions", client.GetActionsHandler(getSecret("signing_secret")))
+	http.HandleFunc("/slack/events",
+		client.GetEventsHandler(conf.GetSigningSecret()))
+	http.HandleFunc("/slack/actions",
+		client.GetActionsHandler(conf.GetSigningSecret()))
 
 	log.Println("[INFO] Server listening")
 
