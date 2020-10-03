@@ -214,6 +214,7 @@ func (client *Client) actionsHandler(w http.ResponseWriter, r *http.Request) {
  */
 func (client *Client) GetEventsHandler(secret string) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println(r.Method, r.URL)
 		body, err := client.verify(secret, w, r)
 		if err != nil {
 			log.Println(err)
