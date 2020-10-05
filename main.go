@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/ioutil"
 	"jelly/configure"
 	"jelly/handler"
 	"log"
@@ -10,8 +11,15 @@ import (
 )
 
 func main() {
-	conf, err := configure.NewConf("./conf.json")
-	if err != nil {
+	path := "./conf.json"
+
+	var conf configure.Conf
+	if bytes, err := ioutil.ReadFile(path); err == nil {
+		if err = configure.NewConf(bytes, conf); err != nil {
+			log.Fatal(err)
+			return
+		}
+	} else {
 		log.Fatal(err)
 		return
 	}

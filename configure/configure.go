@@ -2,7 +2,6 @@ package configure
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"log"
 )
 
@@ -18,26 +17,10 @@ type Secrets struct {
 }
 
 // NewConf returns a new Conf
-func NewConf(path string) (Conf, error) {
-	bytes, err := ioutil.ReadFile(path)
-	if err != nil {
-		log.Fatal(err)
-		return Conf{}, err
-	}
-	var conf Conf
+func NewConf(bytes []byte, conf Conf) error {
 	if err := json.Unmarshal(bytes, &conf); err != nil {
 		log.Fatal(err)
-		return Conf{}, err
+		return err
 	}
-	return conf, nil
-}
-
-// GetSigningSecret is returns a Signing Secret
-func (conf *Conf) GetSigningSecret() string {
-	return conf.Secrets.SigningSecret
-}
-
-// GetOauthAccessToken is returns a Oauth Access Token
-func (conf *Conf) GetOauthAccessToken() string {
-	return conf.Secrets.OauthAccessToken
+	return nil
 }
