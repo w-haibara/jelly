@@ -2,7 +2,8 @@ package configure
 
 import (
 	"encoding/json"
-	"log"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Conf is configuration of app
@@ -17,9 +18,11 @@ type Secrets struct {
 }
 
 // NewConf returns a new Conf
-func NewConf(bytes []byte, conf Conf) error {
-	if err := json.Unmarshal(bytes, &conf); err != nil {
-		log.Fatal(err)
+func NewConf(bytes []byte, conf *Conf) error {
+	if err := json.Unmarshal(bytes, conf); err != nil {
+		log.WithFields(log.Fields{
+			"err": err,
+		}).Error("Json Unmarshal failed")
 		return err
 	}
 	return nil

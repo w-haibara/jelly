@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 
 	"jelly/configure"
 	"jelly/deployer"
@@ -37,15 +38,19 @@ type Client struct {
 func InitClient(path string, client *Client) error {
 	var conf configure.Conf
 	if bytes, err := ioutil.ReadFile(path); err == nil {
-		if err = configure.NewConf(bytes, conf); err != nil {
-			log.Fatal(err)
+		if err = configure.NewConf(bytes, &conf); err != nil {
+			log.WithFields(log.Fields{
+				"err": err,
+			}).Error("NewConf failed")
 			return err
 		}
 	} else {
-		log.Fatal(err)
+		log.WithFields(log.Fields{
+			"err": err,
+		}).Error("ReadFile failed")
 		return err
 	}
-	client = &Client{
+	*client = Client{
 		API: slack.New(conf.Secrets.OauthAccessToken),
 		secrets: secrets{
 			signingSecret: conf.Secrets.SigningSecret,
@@ -101,7 +106,9 @@ func (client *Client) handleDeployCmd(event *slackevents.AppMentionEvent, arg st
 	blocks := slack.MsgOptionBlocks(textSection, actionBlock)
 
 	if _, err := client.API.PostEphemeral(event.Channel, event.User, fallbackText, blocks); err != nil {
-		log.Println(err)
+		log.WithFields(log.Fields{
+			"err": err,
+		}).Error("API PostEphemeral failed")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -134,7 +141,9 @@ func (client *Client) eventsWriteContent(eventsAPIEvent *slackevents.EventsAPIEv
 func (client *Client) eventsHandler(body []byte, w http.ResponseWriter) {
 	eventsAPIEvent, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionNoVerifyToken())
 	if err != nil {
-		log.Println(err)
+		log.WithFields(log.Fields{
+			"err": err,
+		}).Error("ParseEvent failed")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -143,13 +152,17 @@ func (client *Client) eventsHandler(body []byte, w http.ResponseWriter) {
 	case slackevents.URLVerification:
 		var res *slackevents.ChallengeResponse
 		if err := json.Unmarshal(body, &res); err != nil {
-			log.Println(err)
+			log.WithFields(log.Fields{
+				"err": err,
+			}).Error("Json Unmarshal failed")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain")
 		if _, err := w.Write([]byte(res.Challenge)); err != nil {
-			log.Println(err)
+			log.WithFields(log.Fields{
+				"err": err,
+			}).Error("Write bytes failed")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -167,7 +180,9 @@ func (client *Client) handleConfirmDeploymentAction(action *slack.BlockAction, p
 			fmt.Sprintf("<@%s> Canceled", payload.User.ID),
 			false)
 		if _, _, err := client.API.PostMessage(payload.Channel.ID, cancelMsg); err != nil {
-			log.Println(err)
+			log.WithFields(log.Fields{
+				"err": err,
+			}).Error("API PostMessage failed")
 		}
 	} else {
 		go func() {
@@ -175,7 +190,9 @@ func (client *Client) handleConfirmDeploymentAction(action *slack.BlockAction, p
 				fmt.Sprintf("<@%s> deploying commit: `%s`", payload.User.ID, arg),
 				false)
 			if _, _, err := client.API.PostMessage(payload.Channel.ID, startMsg); err != nil {
-				log.Println(err)
+				log.WithFields(log.Fields{
+					"err": err,
+				}).Error("API PostMessage failed")
 			}
 
 			resultMsg := ""
@@ -187,14 +204,18 @@ func (client *Client) handleConfirmDeploymentAction(action *slack.BlockAction, p
 
 			endMsg := slack.MsgOptionText(resultMsg, false)
 			if _, _, err := client.API.PostMessage(payload.Channel.ID, endMsg); err != nil {
-				log.Println(err)
+				log.WithFields(log.Fields{
+					"err": err,
+				}).Error("API PostMessage failed")
 			}
 		}()
 	}
 
 	deleteOriginal := slack.MsgOptionDeleteOriginal(payload.ResponseURL)
 	if _, _, _, err := client.API.SendMessage("", deleteOriginal); err != nil {
-		log.Println(err)
+		log.WithFields(log.Fields{
+			"err": err,
+		}).Error("API SendMessage failed")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -204,7 +225,9 @@ func (client *Client) handleConfirmDeploymentAction(action *slack.BlockAction, p
 func (client *Client) actionsHandler(w http.ResponseWriter, r *http.Request) {
 	var payload *slack.InteractionCallback
 	if err := json.Unmarshal([]byte(r.FormValue("payload")), &payload); err != nil {
-		log.Println(err)
+		log.WithFields(log.Fields{
+			"err": err,
+		}).Error("Json Unmarshal failed")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -231,7 +254,9 @@ func (client *Client) GetEventsHandler() func(w http.ResponseWriter, r *http.Req
 		log.Println(r.Method, r.URL)
 		body, err := client.verify(w, r)
 		if err != nil {
-			log.Println(err)
+			log.WithFields(log.Fields{
+				"err": err,
+			}).Error("Verify failed")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -245,7 +270,9 @@ func (client *Client) GetActionsHandler() func(w http.ResponseWriter, r *http.Re
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := client.verify(w, r)
 		if err != nil {
-			log.Println(err)
+			log.WithFields(log.Fields{
+				"err": err,
+			}).Error("Verify failed")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
