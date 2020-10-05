@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"jelly/configure"
 	"jelly/deployer"
 
 	"github.com/slack-go/slack"
@@ -22,22 +23,40 @@ const (
 	gitBranch               = "master"
 )
 
-// Client is infomation of connection to API
-type Client struct {
-	API    *slack.Client
-	secret string
+type secrets struct {
+	signingSecret string
 }
 
-// NewClient Create new Client
-func NewClient(api *slack.Client) *Client {
-	return &Client{
-		API: api,
+// Client is infomation of connection to API
+type Client struct {
+	API     *slack.Client
+	secrets secrets
+}
+
+// InitClient is ...
+func InitClient(path string, client *Client) error {
+	var conf configure.Conf
+	if bytes, err := ioutil.ReadFile(path); err == nil {
+		if err = configure.NewConf(bytes, conf); err != nil {
+			log.Fatal(err)
+			return err
+		}
+	} else {
+		log.Fatal(err)
+		return err
 	}
+	client = &Client{
+		API: slack.New(conf.Secrets.OauthAccessToken),
+		secrets: secrets{
+			signingSecret: conf.Secrets.SigningSecret,
+		},
+	}
+	return nil
 }
 
 // verify Request Verifier
-func (client *Client) verify(secret string, w http.ResponseWriter, r *http.Request) ([]byte, error) {
-	verifier, err := slack.NewSecretsVerifier(r.Header, secret)
+func (client *Client) verify(w http.ResponseWriter, r *http.Request) ([]byte, error) {
+	verifier, err := slack.NewSecretsVerifier(r.Header, client.secrets.signingSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -207,10 +226,10 @@ func (client *Client) actionsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetEventsHandler returns a http handler of events
-func (client *Client) GetEventsHandler(secret string) func(w http.ResponseWriter, r *http.Request) {
+func (client *Client) GetEventsHandler() func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println(r.Method, r.URL)
-		body, err := client.verify(secret, w, r)
+		body, err := client.verify(w, r)
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -222,9 +241,9 @@ func (client *Client) GetEventsHandler(secret string) func(w http.ResponseWriter
 }
 
 // GetActionsHandler returns a http handler of action
-func (client *Client) GetActionsHandler(secret string) func(w http.ResponseWriter, r *http.Request) {
+func (client *Client) GetActionsHandler() func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		body, err := client.verify(secret, w, r)
+		body, err := client.verify(w, r)
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)

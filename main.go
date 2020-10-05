@@ -2,13 +2,9 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
-	"jelly/configure"
 	"jelly/handler"
 	"log"
 	"net/http"
-
-	"github.com/slack-go/slack"
 )
 
 func main() {
@@ -16,23 +12,14 @@ func main() {
 	flag.Parse()
 	log.Println("configuration file: ", *path)
 
-	var conf configure.Conf
-	if bytes, err := ioutil.ReadFile(*path); err == nil {
-		if err = configure.NewConf(bytes, conf); err != nil {
-			log.Fatal(err)
-			return
-		}
-	} else {
+	var client *handler.Client
+	if err := handler.InitClient(*path, client); err != nil {
 		log.Fatal(err)
 		return
 	}
 
-	client := handler.NewClient(slack.New(conf.Secrets.OauthAccessToken))
-
-	http.HandleFunc("/slack/events",
-		client.GetEventsHandler(conf.Secrets.SigningSecret))
-	http.HandleFunc("/slack/actions",
-		client.GetActionsHandler(conf.Secrets.SigningSecret))
+	http.HandleFunc("/slack/events", client.GetEventsHandler())
+	http.HandleFunc("/slack/actions", client.GetActionsHandler())
 
 	log.Println("[INFO] Server listening")
 
