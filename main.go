@@ -16,14 +16,12 @@ func main() {
 		return
 	}
 
-	client := handler.NewClient(
-		slack.New(conf.GetOauthAccessToken()),
-	)
+	client := handler.NewClient(slack.New(conf.Secrets.OauthAccessToken))
 
 	http.HandleFunc("/slack/events",
-		client.GetEventsHandler(conf.GetSigningSecret()))
+		client.GetEventsHandler(conf.Secrets.SigningSecret))
 	http.HandleFunc("/slack/actions",
-		client.GetActionsHandler(conf.GetSigningSecret()))
+		client.GetActionsHandler(conf.Secrets.SigningSecret))
 
 	log.Println("[INFO] Server listening")
 
