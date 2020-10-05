@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"io/ioutil"
 	"jelly/configure"
 	"jelly/handler"
@@ -11,10 +12,12 @@ import (
 )
 
 func main() {
-	path := "./conf.json"
+	path := flag.String("conf", "./conf.json", "path to configration file")
+	flag.Parse()
+	log.Println("configuration file: ", *path)
 
 	var conf configure.Conf
-	if bytes, err := ioutil.ReadFile(path); err == nil {
+	if bytes, err := ioutil.ReadFile(*path); err == nil {
 		if err = configure.NewConf(bytes, conf); err != nil {
 			log.Fatal(err)
 			return
