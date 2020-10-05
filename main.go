@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/slack-go/slack"
 	"jelly/configure"
 	"jelly/handler"
 	"log"
 	"net/http"
+
+	"github.com/slack-go/slack"
 )
 
 func main() {

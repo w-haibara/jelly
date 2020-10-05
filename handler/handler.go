@@ -10,34 +10,32 @@ import (
 	"net/http"
 	"strings"
 
+	"jelly/deployer"
+
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
-	"jelly/deployer"
 )
 
 const (
 	confirmDeploymentAction = "confirm-deployment"
-	releaseUrl              = "https://github.com/w-haibara/portfolio/releases"
+	releaseURL              = "https://github.com/w-haibara/portfolio/releases"
 	gitBranch               = "master"
 )
 
+// Client is infomation of connection to API
 type Client struct {
-	Api    *slack.Client
+	API    *slack.Client
 	secret string
 }
 
-/*
- * Create new Client
- */
+// NewClient Create new Client
 func NewClient(api *slack.Client) *Client {
 	return &Client{
-		Api: api,
+		API: api,
 	}
 }
 
-/*
- * Request Verifier
- */
+// verify Request Verifier
 func (client *Client) verify(secret string, w http.ResponseWriter, r *http.Request) ([]byte, error) {
 	verifier, err := slack.NewSecretsVerifier(r.Header, secret)
 	if err != nil {
@@ -57,16 +55,14 @@ func (client *Client) verify(secret string, w http.ResponseWriter, r *http.Reque
 	return body, nil
 }
 
-/*
- * Events Handler
- */
+// handleDeployCmd handle deploy command
 func (client *Client) handleDeployCmd(event *slackevents.AppMentionEvent, arg string, w http.ResponseWriter) {
 	msg := ""
 	if arg == "" {
 		arg = "latest"
-		msg = fmt.Sprintf("The latest version will be deploy (%v)", releaseUrl+"/latest")
+		msg = fmt.Sprintf("The latest version will be deploy (%v)", releaseURL+"/latest")
 	} else {
-		msg = fmt.Sprintf("Commit: `%v` will be deploy (%v)", arg, releaseUrl+"/tag/"+arg)
+		msg = fmt.Sprintf("Commit: `%v` will be deploy (%v)", arg, releaseURL+"/tag/"+arg)
 	}
 	msg += "\nDo you want to continue?"
 	text := slack.NewTextBlockObject(slack.MarkdownType, msg, false, false)
@@ -85,13 +81,14 @@ func (client *Client) handleDeployCmd(event *slackevents.AppMentionEvent, arg st
 	fallbackText := slack.MsgOptionText("This client is not supported.", false)
 	blocks := slack.MsgOptionBlocks(textSection, actionBlock)
 
-	if _, err := client.Api.PostEphemeral(event.Channel, event.User, fallbackText, blocks); err != nil {
+	if _, err := client.API.PostEphemeral(event.Channel, event.User, fallbackText, blocks); err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }
 
+//eventsWriteContent write content to w
 func (client *Client) eventsWriteContent(eventsAPIEvent *slackevents.EventsAPIEvent, w http.ResponseWriter) {
 	innerEvent := eventsAPIEvent.InnerEvent
 	switch event := innerEvent.Data.(type) {
@@ -114,6 +111,7 @@ func (client *Client) eventsWriteContent(eventsAPIEvent *slackevents.EventsAPIEv
 	}
 }
 
+// eventsHandler is http handler of events
 func (client *Client) eventsHandler(body []byte, w http.ResponseWriter) {
 	eventsAPIEvent, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionNoVerifyToken())
 	if err != nil {
@@ -141,9 +139,7 @@ func (client *Client) eventsHandler(body []byte, w http.ResponseWriter) {
 	}
 }
 
-/*
- * Actions Handler
- */
+// handleConfirmDeploymentAction handle ConfirmDeployment action
 func (client *Client) handleConfirmDeploymentAction(action *slack.BlockAction, payload *slack.InteractionCallback, w http.ResponseWriter) {
 	arg := action.Value
 
@@ -151,7 +147,7 @@ func (client *Client) handleConfirmDeploymentAction(action *slack.BlockAction, p
 		cancelMsg := slack.MsgOptionText(
 			fmt.Sprintf("<@%s> Canceled", payload.User.ID),
 			false)
-		if _, _, err := client.Api.PostMessage(payload.Channel.ID, cancelMsg); err != nil {
+		if _, _, err := client.API.PostMessage(payload.Channel.ID, cancelMsg); err != nil {
 			log.Println(err)
 		}
 	} else {
@@ -159,7 +155,7 @@ func (client *Client) handleConfirmDeploymentAction(action *slack.BlockAction, p
 			startMsg := slack.MsgOptionText(
 				fmt.Sprintf("<@%s> deploying commit: `%s`", payload.User.ID, arg),
 				false)
-			if _, _, err := client.Api.PostMessage(payload.Channel.ID, startMsg); err != nil {
+			if _, _, err := client.API.PostMessage(payload.Channel.ID, startMsg); err != nil {
 				log.Println(err)
 			}
 
@@ -171,20 +167,21 @@ func (client *Client) handleConfirmDeploymentAction(action *slack.BlockAction, p
 			}
 
 			endMsg := slack.MsgOptionText(resultMsg, false)
-			if _, _, err := client.Api.PostMessage(payload.Channel.ID, endMsg); err != nil {
+			if _, _, err := client.API.PostMessage(payload.Channel.ID, endMsg); err != nil {
 				log.Println(err)
 			}
 		}()
 	}
 
 	deleteOriginal := slack.MsgOptionDeleteOriginal(payload.ResponseURL)
-	if _, _, _, err := client.Api.SendMessage("", deleteOriginal); err != nil {
+	if _, _, _, err := client.API.SendMessage("", deleteOriginal); err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }
 
+// actionsHandler is a http handler of action
 func (client *Client) actionsHandler(w http.ResponseWriter, r *http.Request) {
 	var payload *slack.InteractionCallback
 	if err := json.Unmarshal([]byte(r.FormValue("payload")), &payload); err != nil {
@@ -209,9 +206,7 @@ func (client *Client) actionsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-/*
- * Handler Getters
- */
+// GetEventsHandler returns a http handler of events
 func (client *Client) GetEventsHandler(secret string) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println(r.Method, r.URL)
@@ -226,6 +221,7 @@ func (client *Client) GetEventsHandler(secret string) func(w http.ResponseWriter
 	}
 }
 
+// GetActionsHandler returns a http handler of action
 func (client *Client) GetActionsHandler(secret string) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := client.verify(secret, w, r)
